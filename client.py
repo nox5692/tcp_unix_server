@@ -95,27 +95,34 @@ class Client:
 
         except KeyboardInterrupt:
             print("KeyboardInterrupt: Exiting...")
+            pass
 
         finally:
+            # Cleanup
             stop_event.set()
             recv_thread.join()
-            with self._lock: # Cleanup
-                if self._socket.fileno() != -1:
-                    self._socket.shutdown(socket.SHUT_RDWR)  # Shutdown both send and receive operations
-                    self._socket.close()
-                    print("Cleanup complete.")
-                else:
-                    print("Connection already closed.")
+            with self._lock:
+                try:
+                    if self._socket is not None:
+                        if self._socket.fileno() != -1:
+                            self._socket.shutdown(socket.SHUT_RDWR) # Shutdown both send and receive operations
+                            self._socket.close()
+                            print("Cleanup complete.")
+                        else:
+                            print("Connection already closed.")
+                except OSError as e:
+                    print(f"Error during cleanup: {e}")
+
 
 
 if __name__ == "__main__":
     arguments: list[str] = sys.argv[1:]
     if len(arguments) < 2 and arguments[0] == SocketType.UNIX.value:
         print_usage()
-        exit(1)
+        exit()
     if len(arguments) < 3 and arguments[0] == SocketType.TCP.value:
         print_usage()
-        exit(1)
+        exit()
 
     client: Client = Client(arguments)
     res: bool = client.connect()
