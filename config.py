@@ -1,4 +1,4 @@
-# Only 1 client in queue
+# MAx 5 clients at the same time
 CLIENT_CNT : int = 5
 MAX_MSG_LEN : int = 1024
 

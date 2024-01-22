@@ -3,24 +3,26 @@ import threading
 import os
 from config import *
 
-
+# This class represents a struture like instance of a client that has connected to the server
 class ConnectedClient:
     def __init__(self, client_id: int, client_socket: socket.socket):
         self._client_id: int = client_id
         self._client_socket: socket.socket = client_socket
         self._is_in_game: bool = False
         self._in_game_with: int = None
-        self._is_guessing: bool = None  # If true, is client B, if false, is client A
+        self._is_guessing: bool = None  # If true: is client B, if false: is client A
         self._word_to_guess: str = None
 
 
 # The server object starts both types of sockets and manages traffic in between
 class Server:
+    # Server constructor
+    # The server holds all of the clients as instanced of the ConenctedClient class
+    # and also their IDs as a ID counter
     def __init__(self):
         self._clients: dict[int, ConnectedClient] = {}
         self._client_id_counter: int = 1  # First client will have the ID of 1
         self._lock: threading.Lock = threading.Lock()
-
 
     # Handles client connection and their requests and messages
     def handle_client(
@@ -34,7 +36,7 @@ class Server:
         # Send a welcome message to the client
         connected_client._client_socket.send(f"Welcome, enter password".encode("utf-8"))
 
-        # Reuest client password 
+        # Reuest client password
         password: bytes = connected_client._client_socket.recv(MAX_MSG_LEN)
         if not password or password.decode().lower() != PASSWORD:
             connected_client._client_socket.send("Wrong password.".encode())
@@ -46,70 +48,64 @@ class Server:
             f"Correct password, welcome, client {connected_client._client_id}".encode()
         )
 
-        # Receive and handle client data
+        # The main loop responsible for client input data and the game
+        # 
         while True:
             # Get input from client
             data: bytes = connected_client._client_socket.recv(MAX_MSG_LEN)
             if not data:
                 break
             decoded_data: str = data.decode("utf-8")
-            print(
-                f"Received data from Client {connected_client._client_id}: {decoded_data}"
-            )
+            print(f"Received data from Client {connected_client._client_id}: {decoded_data}")
 
-            # If game is played
-            if self._clients.get(connected_client._client_id)._is_in_game:
-                # If the guesser is playing
-                if self._clients.get(connected_client._client_id)._is_guessing:
-                    if (
-                        decoded_data.lower()
-                        == self._clients.get(connected_client._client_id)._word_to_guess
-                    ):
+            # If game is played, client input will be a part of the game and thus normal input flags (-msg, -play, -list) are invalid
+            if connected_client._is_in_game:
+                # If the client is a guesser/assignor
+                # The client is the one guessing
+                if connected_client._is_guessing:
+                    # The word is correct and all of the game flags need to be reset to their initial state,
+                    # so that the next iteration of the main loop will not count the clients as if they 
+                    # were still in the game
+                    if decoded_data.lower() == connected_client._word_to_guess:
                         connected_client._client_socket.send("You have won!".encode())
-                        self._clients.get(
-                            self._clients.get(connected_client._client_id)._in_game_with
-                        )._client_socket.send(
+                        self._clients.get(connected_client._in_game_with)._client_socket.send(
                             f"Opponent has guessed correctly: {decoded_data}".encode()
                         )
-                        self._clients.get(
-                            self._clients.get(connected_client._client_id)._in_game_with
-                        )._is_in_game = False
-                        self._clients.get(
-                            self._clients.get(connected_client._client_id)._in_game_with
-                        )._in_game_with = None
-                        self._clients.get(
-                            self._clients.get(connected_client._client_id)._in_game_with
-                        )._is_guessing = None
-                        self._clients.get(
-                            self._clients.get(connected_client._client_id)._in_game_with
-                        )._word_to_guess = None
-                        self._clients.get(
-                            connected_client._client_id
-                        )._is_in_game = False
-                        self._clients.get(
-                            connected_client._client_id
-                        )._in_game_with = None
-                        self._clients.get(
-                            connected_client._client_id
-                        )._is_guessing = None
-                        self._clients.get(
-                            connected_client._client_id
-                        )._word_to_guess = None
+                        self._clients.get(connected_client._in_game_with)._is_in_game = False
+                        self._clients.get(connected_client._in_game_with)._in_game_with = None
+                        self._clients.get(connected_client._in_game_with)._is_guessing = None
+                        self._clients.get(connected_client._in_game_with)._word_to_guess = None
+                        connected_client._is_in_game = False
+                        connected_client._in_game_with = None
+                        connected_client._is_guessing = None
+                        connected_client._word_to_guess = None
                         continue
+                        # The guesser has surrendered and everything is being reset
+                    elif decoded_data.lower() == "exit":
+                        connected_client._client_socket.send("You have surrendered.".encode())
+                        self._clients.get(connected_client._in_game_with)._client_socket.send(
+                            f"Opponent has currendered, you win!".encode()
+                        )
+                        self._clients.get(connected_client._in_game_with)._is_in_game = False
+                        self._clients.get(connected_client._in_game_with)._in_game_with = None
+                        self._clients.get(connected_client._in_game_with)._is_guessing = None
+                        self._clients.get(connected_client._in_game_with)._word_to_guess = None
+                        connected_client._is_in_game = False
+                        connected_client._in_game_with = None
+                        connected_client._is_guessing = None
+                        connected_client._word_to_guess = None
+                    # The guess was wrong and the loop continues
                     else:
                         connected_client._client_socket.send("Wrong.".encode())
-                        self._clients.get(
-                            self._clients.get(connected_client._client_id)._in_game_with
-                        )._client_socket.send(
+                        self._clients.get(connected_client._in_game_with)._client_socket.send(
                             f"Opponent has guessed incorrectly: {decoded_data}".encode()
                         )
-                        continue
-                # If the instigator is playing
+                    # The client is the one assigning
                 else:
                     # We will send a hint to the guesser if needed
-                    self._clients.get(
-                        connected_client._in_game_with
-                    )._client_socket.send(f"Hint: {decoded_data}".encode())
+                    self._clients.get(connected_client._in_game_with)._client_socket.send(
+                        f"Hint: {decoded_data}".encode()
+                    )
                     continue
             # If game is not played
             else:
@@ -144,18 +140,20 @@ class Server:
                 elif decoded_data.startswith("-play"):
                     try:
                         _, target_client_id, word_to_guess = decoded_data.split(" ", 2)
+                        # If input is incomplete or incorrect
                         if not target_client_id or not word_to_guess:
                             connected_client._client_socket.send(
                                 "Usage: -play <client_id> <word_to_guess>".encode()
                             )
                             continue
                         target_id: int = int(target_client_id)
+                        # If the ID is not an integer
                         if not target_id:
                             connected_client._client_socket.send(
                                 "Client ID needs to be a number.".encode()
                             )
                             continue
-                        # Get target client socket
+                        # Get target client socket, this will be the client the game will be played with
                         target_client = None
                         with self._lock:
                             target_client = self._clients.get(target_id)
@@ -170,22 +168,16 @@ class Server:
                             )
                             continue
                         # START GAME
+                        # Setting ConnectedClient flags so that the main loop will recognize their input as game input
                         target_client._is_in_game = True
                         target_client._in_game_with = connected_client._client_id
                         target_client._word_to_guess = word_to_guess
                         target_client._is_guessing = True
-                        self._clients.get(
-                            connected_client._client_id
-                        )._is_in_game = True
-                        self._clients.get(
-                            connected_client._client_id
-                        )._in_game_with = target_client._client_id
-                        self._clients.get(
-                            connected_client._client_id
-                        )._word_to_guess = word_to_guess
-                        self._clients.get(
-                            connected_client._client_id
-                        )._is_guessing = False
+                        # For each client, their respective opponent needy to be assigned
+                        connected_client._is_in_game = True
+                        connected_client._in_game_with = target_client._client_id
+                        connected_client._word_to_guess = word_to_guess
+                        connected_client._is_guessing = False
 
                         with self._lock:
                             connected_client._client_socket.send(
@@ -194,6 +186,7 @@ class Server:
                             target_client._client_socket.send(
                                 f"Starting word guessing game with Client {connected_client._client_id}.".encode()
                             )
+                    # Catching exepctions such as: invalid int parse, socket errors ...
                     except Exception as e:
                         connected_client._client_socket.send(f"{e}".encode())
 
@@ -272,9 +265,7 @@ class Server:
             with self._lock:
                 client_id = self._client_id_counter
                 self._client_id_counter += 1
-                connected_client: ConnectedClient = ConnectedClient(
-                    client_id, client_socket
-                )
+                connected_client: ConnectedClient = ConnectedClient(client_id, client_socket)
                 self._clients[client_id] = connected_client
 
             client_thread = threading.Thread(

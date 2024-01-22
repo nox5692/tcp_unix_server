@@ -5,7 +5,6 @@ from enum import Enum
 from config import *
 
 
-
 def print_usage() -> None:
     print('Usage: ["tcp", "unix"] [address, socket_path] [tcp_port (only for tcp)]')
 
@@ -23,7 +22,9 @@ class Client:
     def __init__(self, server_info: list[str]):
         self._type: str = server_info[0].lower()
         self._server_info: list[str] = server_info[1:]
-        self._socket: socket.socket = None  # Leave client socket unitialized until the start instruction is called
+        self._socket: socket.socket = (
+            None  # Leave client socket unitialized until the start instruction is called
+        )
         self._lock: threading.Lock = threading.Lock()
         self._connected: bool = False
 
@@ -69,12 +70,11 @@ class Client:
                 server_response = self._socket.recv(MAX_MSG_LEN)
                 if not server_response:
                     break
-                print("Server:", server_response.decode('utf-8'))
+                print("Server:", server_response.decode("utf-8"))
             except socket.error as e:
                 print("Error receiving message:", e)
                 break
         self._connected = False
-
 
     # Starts communicating with the server that the client is currently connected to
     def communicate(self) -> None:
@@ -98,21 +98,22 @@ class Client:
             pass
 
         finally:
-            # Cleanup
+            # Cleanup socket and threads
             stop_event.set()
             recv_thread.join()
             with self._lock:
                 try:
                     if self._socket is not None:
                         if self._socket.fileno() != -1:
-                            self._socket.shutdown(socket.SHUT_RDWR) # Shutdown both send and receive operations
+                            self._socket.shutdown(
+                                socket.SHUT_RDWR
+                            )  # Shutdown both send and receive operations
                             self._socket.close()
                             print("Cleanup complete.")
                         else:
                             print("Connection already closed.")
                 except OSError as e:
                     print(f"Error during cleanup: {e}")
-
 
 
 if __name__ == "__main__":
