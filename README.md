@@ -15,11 +15,11 @@ Once the client is connected, the client needs to input a password: `please`. Th
 ### Client input options
 Once the client is connected and verified. They were assigned an ID number and can now send inputs.
 While not being in th game, the client is able to send these types of messages:
-    - `exit` - Disconnects client from the server
-    - `-msg <client_id> <message>` This sends a direct private message to the client with the specified ID.
-    - `-list` This lists all the connected active clients (their IDs).
-    - `-play <client_id> <word_to_guess>` This initiates a game with the client with the spcified ID. The other client will have to guess the word that was specified.
-    - Any other input will be echoed back to the client.
+- `exit` - Disconnects client from the server
+- `-msg <client_id> <message>` This sends a direct private message to the client with the specified ID.
+- `-list` This lists all the connected active clients (their IDs).
+- `-play <client_id> <word_to_guess>` This initiates a game with the client with the spcified ID. The other client will have to guess the word that was specified.
+- Any other input will be echoed back to the client.
 
 ### While in game
 Now that client A has initiated the game and client B was brought into the game as the guesser, client B can begin to guess the word just by typing an input.
